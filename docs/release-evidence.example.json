@@ -1,0 +1,7 @@
+{
+  "paypal": { "verified": false, "reviewedBy": "", "at": "", "artifacts": [], "note": "Real supplier sandbox invoice, buyer checkout, signed webhook and authoritative reconciliation; mismatch and replay checks." },
+  "ai": { "verified": false, "reviewedBy": "", "at": "", "artifacts": [], "note": "Redacted corpus report, free-tier/card status, quotas, privacy controls, expiry and gateway topology if used." },
+  "hosting": { "verified": false, "reviewedBy": "", "at": "", "artifacts": [], "note": "Hosted auth, role/tenant isolation, private bucket, migration and deletion recovery; judging availability and verified credit expiry." },
+  "naming": { "verified": false, "reviewedBy": "", "at": "", "artifacts": [], "note": "Exact/fuzzy registry check, domain result and any material risk acknowledged. No domain purchase required." },
+  "submission": { "verified": false, "reviewedBy": "", "at": "", "artifacts": [], "note": "Public MIT repo, functional judge instructions or URL, public YouTube video under 180 seconds, truthful runtime/development AI disclosures." }
+}

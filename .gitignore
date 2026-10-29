@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+.data/
+.npm-cache/
+test-results/
+playwright-report/
+*.log
+coverage/
+release-evidence.local.json
