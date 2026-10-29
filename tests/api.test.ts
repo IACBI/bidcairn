@@ -216,24 +216,61 @@ describe("HTTP authority and workspace isolation", () => {
   });
   it("stores uploaded PDFs privately, masks identity and deletes their bytes with the purchase", async () => {
     const a = await user();
-    let response = await a.agent.post("/api/purchases").set("Origin",origin).set("x-csrf-token",a.csrf).send({reference:false});
+    let response = await a.agent
+      .post("/api/purchases")
+      .set("Origin", origin)
+      .set("x-csrf-token", a.csrf)
+      .send({ reference: false });
     let p = response.body as Purchase;
     expect(p.synthetic).toBe(true);
-    response = await a.agent.post(`/api/purchases/${p.id}/brief`).set("Origin",origin).set("x-csrf-token",a.csrf).set("If-Match",String(p.version)).send({title:p.title,buyerEmail:p.buyerEmail,rubric:p.rubric});
-    p=response.body;
-    const bytes=referencePDF([{page:1,text:"Synthetic Cedar Supplier. Contact: cedar@example.com. All-inclusive USD 1000. Delivery in 20 calendar days. Defect warranty lasts 30 days."}]);
-    response = await a.agent.post(`/api/purchases/${p.id}/proposals`).set("Origin",origin).set("x-csrf-token",a.csrf).set("If-Match",String(p.version))
-      .field("supplierName","Cedar Supplier").field("supplierEmail","cedar@example.com").field("synthetic","true").attach("file",bytes,{filename:"cedar.pdf",contentType:"application/pdf"});
+    response = await a.agent
+      .post(`/api/purchases/${p.id}/brief`)
+      .set("Origin", origin)
+      .set("x-csrf-token", a.csrf)
+      .set("If-Match", String(p.version))
+      .send({ title: p.title, buyerEmail: p.buyerEmail, rubric: p.rubric });
+    p = response.body;
+    const bytes = referencePDF([
+      {
+        page: 1,
+        text: "Synthetic Cedar Supplier. Contact: cedar@example.com. All-inclusive USD 1000. Delivery in 20 calendar days. Defect warranty lasts 30 days.",
+      },
+    ]);
+    response = await a.agent
+      .post(`/api/purchases/${p.id}/proposals`)
+      .set("Origin", origin)
+      .set("x-csrf-token", a.csrf)
+      .set("If-Match", String(p.version))
+      .field("supplierName", "Cedar Supplier")
+      .field("supplierEmail", "cedar@example.com")
+      .field("synthetic", "true")
+      .attach("file", bytes, {
+        filename: "cedar.pdf",
+        contentType: "application/pdf",
+      });
     expect(response.status).toBe(200);
-    p=response.body;
-    expect(JSON.stringify(p.proposals[0].pages)).not.toContain("Cedar Supplier");
+    p = response.body;
+    expect(JSON.stringify(p.proposals[0].pages)).not.toContain(
+      "Cedar Supplier",
+    );
     expect(p.proposals[0].identity.name).toBe("");
     expect(p.proposals[0].analysis).toBeUndefined();
-    const path=resolve(".data/test-uploads/documents",p.proposals[0].documentId!);
+    const path = resolve(
+      ".data/test-uploads/documents",
+      p.proposals[0].documentId!,
+    );
     expect(await readFile(path)).toEqual(bytes);
-    const removed = await a.agent.delete(`/api/purchases/${p.id}`).set("Origin",origin).set("x-csrf-token",a.csrf).set("If-Match",String(p.version)).send({confirm:"DELETE"});
-    expect(removed.body).toEqual({deleted:true,documentCleanupPending:false});
-    await expect(readFile(path)).rejects.toMatchObject({code:"ENOENT"});
+    const removed = await a.agent
+      .delete(`/api/purchases/${p.id}`)
+      .set("Origin", origin)
+      .set("x-csrf-token", a.csrf)
+      .set("If-Match", String(p.version))
+      .send({ confirm: "DELETE" });
+    expect(removed.body).toEqual({
+      deleted: true,
+      documentCleanupPending: false,
+    });
+    await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
     expect(await store.pendingDocumentDeletes()).toEqual([]);
   });
 });

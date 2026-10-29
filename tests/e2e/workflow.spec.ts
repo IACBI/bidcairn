@@ -91,7 +91,9 @@ test("a purchasing brief supports explicit scope edits without triggering infere
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("listitem").filter({hasText:"Provide an accessibility acceptance checklist"}),
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Provide an accessibility acceptance checklist" }),
   ).toBeVisible();
   await expect(
     page.getByText("No runtime analysis yet", { exact: true }),

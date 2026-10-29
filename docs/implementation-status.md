@@ -26,5 +26,6 @@ AI extracts and explains evidence. Application code calculates scores and cash f
 - Sandbox-only PayPal adapter, durable draft attempt, invoice mismatch checks, controlled correction/publication, safe payer link, signature verification and authoritative reconciliation. Real merchant lifecycle remains unverified.
 - 37 unit/integration tests and 3 browser tests passed locally; production build and strict TypeScript checks passed. Production dependency audit reports zero known vulnerabilities after the PDF.js security update.
 - GitHub Advanced Security content scanning was unavailable for this repository; local source-pattern checks are supplementary, not a complete secret/security certification. Local credentials and generated data are excluded from publication.
+- The MIT source is public at https://github.com/IACBI/bidcairn. [GitHub Actions run 1](https://github.com/IACBI/bidcairn/actions/runs/40952032878) completed successfully on commit `c4fbd362e38e6f167cefbcb6e8fa2f48dd9fa02f`, independently running the tests/build/browser workflow on Linux.
 
 These results do not pass the external gates. No deployed service, real AI result, sandbox settlement or final video is claimed.
