@@ -293,6 +293,20 @@ export class PayPal {
   ) {
     const merchant = this.merchant(vendorId);
     ensure(merchant.webhookId, "Webhook verification is not configured.", 503);
+    for (const name of [
+      "paypal-auth-algo",
+      "paypal-cert-url",
+      "paypal-transmission-id",
+      "paypal-transmission-sig",
+      "paypal-transmission-time",
+    ]) {
+      const value = headers[name];
+      ensure(
+        typeof value === "string" && value.length > 0 && value.length <= 4096,
+        "Required PayPal signature headers are missing or invalid.",
+        400,
+      );
+    }
     const result = (await this.call(
       vendorId,
       "/v1/notifications/verify-webhook-signature",
