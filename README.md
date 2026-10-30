@@ -57,7 +57,7 @@ Subscribe to `INVOICING.INVOICE.PAID`, `INVOICING.INVOICE.UPDATED`, `INVOICING.I
 
 After human award approval, create a real sandbox draft from the supplier console. Inspect the mismatch, correct the draft, publish it, and choose **Review & pay on PayPal**. Complete checkout as the sandbox buyer. Reconcile, or wait for a genuine signature-verified webhook. `PAID` requires matching merchant, recipient, reference, USD amount, zero amount due and PayPal payment records. A partial/pending event or an external mark-as-paid is not settlement.
 
-Durable request IDs are stored before creating invoices. An uncertain outcome reuses the original attempt; it does not create a new financial action blindly. Notifications to invoice recipients are suppressed in the synthetic sandbox workflow.
+Durable request IDs and award-derived invoice numbers are stored before creating invoices. The returned invoice identity is persisted before its terms are read; a failed read leaves a visible, non-payable state that can be reconciled. If the creation response is lost, recovery searches the merchant account for exactly one matching invoice number and award reference. Missing or ambiguous results require investigation; recovery never sends another create request. Notifications to invoice recipients are suppressed in the synthetic sandbox workflow.
 
 ## Runtime AI
 
@@ -90,7 +90,7 @@ npm run test:e2e
 npm run verify:gates
 ```
 
-The last command intentionally exits non-zero while external evidence is incomplete. On Windows, the browser test uses installed Microsoft Edge. CI installs Chromium. For Linux local testing set `CI=1` and install Chromium with `npx playwright install chromium`.
+The last command intentionally exits non-zero while external evidence is incomplete. The [submission audit](docs/submission-requirements.md) maps the current official deliverables and custom fields to their required evidence. On Windows, the browser test uses installed Microsoft Edge. CI installs Chromium. For Linux local testing set `CI=1` and install Chromium with `npx playwright install chromium`.
 
 Tests cover score intervals, cash limits, human approval order, stale revisions, identity leakage, session isolation, CSRF, evidence fabrication, budget reservations, merchant mismatch and partial/pending/external payment states. See [security boundaries](docs/security.md) and [the demo script](docs/demo-script.md).
 

@@ -12,6 +12,7 @@
 - Numeric scores are deterministic and disclose their anchors; unconfirmed terms produce intervals. Purchasing gates cannot be overridden by a high score.
 - Award snapshots and existing audit events are immutable through save operations. Infrastructure administrators can still alter stored data; this is not tamper-proof evidence.
 - PayPal base URLs are fixed to sandbox. Invoice payer links must use HTTPS and the sandbox PayPal invoice path. Webhook postback verification uses the stored merchant-specific webhook ID.
+- An accepted invoice identity is stored before reconciliation. An uncertain creation response is recovered through an exact invoice-number/award-reference search; a missing or ambiguous result cannot trigger another create. An unverified invoice has no payment link.
 - Webhooks reread the authoritative invoice. Events are deduplicated by their IDs in the purchase record. State is not inferred from delivery order or the event name alone.
 - Public synthetic evaluation has request/purchase/input caps and a durable global inference budget. This does not establish DDoS resistance or an enterprise SLA.
 - Explicit owner deletion atomically removes the purchase and queues its private files. Failed file cleanup retries every minute while the service runs. Usage accounting remains to prevent deletion from resetting quotas; upstream PayPal/AI records and provider backups have their own retention.

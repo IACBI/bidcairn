@@ -188,6 +188,7 @@ export interface Award extends Assessment {
 }
 export interface Invoice {
   id: string;
+  number?: string;
   provider: "simulation" | "paypal-sandbox";
   proposalId: string;
   awardId: string;

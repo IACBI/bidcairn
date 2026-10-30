@@ -129,11 +129,23 @@ export function App() {
   }
   async function command(path: string, body: unknown = {}) {
     const p = currentVersion.current!;
-    const next = await api<Purchase>(`/purchases/${p.id}${path}`, {
-      method: "POST",
-      headers: { "If-Match": String(p.version) },
-      body: body instanceof FormData ? body : JSON.stringify(body),
-    });
+    let next: Purchase;
+    try {
+      next = await api<Purchase>(`/purchases/${p.id}${path}`, {
+        method: "POST",
+        headers: { "If-Match": String(p.version) },
+        body: body instanceof FormData ? body : JSON.stringify(body),
+      });
+    } catch (error) {
+      if (path === "/invoice") {
+        try {
+          setPurchase(await api<Purchase>(`/purchases/${p.id}`));
+        } catch {
+          /* Preserve the operation error if the refresh is also unavailable. */
+        }
+      }
+      throw error;
+    }
     setPurchase(next);
     return next;
   }
@@ -1318,7 +1330,9 @@ export function App() {
                                   })
                                 }
                               >
-                                Create real sandbox draft
+                                {purchase.invoiceAttempt
+                                  ? "Recover sandbox invoice"
+                                  : "Create real sandbox draft"}
                                 <ArrowUpRight size={15} />
                               </button>
                             </div>
@@ -1375,8 +1389,9 @@ export function App() {
                                       ),
                                     )}
                                     <small>
-                                      Correct the draft. The approved award
-                                      cannot be silently changed.
+                                      {purchase.invoice.state === "unknown"
+                                        ? "The invoice identity is saved. Reconcile its terms before taking another action."
+                                        : "Correct the draft. The approved award cannot be silently changed."}
                                     </small>
                                   </div>
                                 </div>
@@ -1387,28 +1402,28 @@ export function App() {
                                 </div>
                               )}
                               <p className="small muted">
-                                Last checked{" "}
-                                {new Date(
-                                  purchase.invoice.lastReconciledAt,
-                                ).toLocaleString()}{" "}
+                                {purchase.invoice.lastReconciledAt
+                                  ? `Last checked ${new Date(purchase.invoice.lastReconciledAt).toLocaleString()}`
+                                  : "Authoritative terms not yet verified"}{" "}
                                 · Award {purchase.invoice.awardId.slice(0, 8)}
                               </p>
                             </div>
                             <div className="button-row">
-                              {purchase.invoice.mismatch.length > 0 && (
-                                <button
-                                  className="button primary"
-                                  disabled={busy || !can("approver")}
-                                  onClick={() =>
-                                    void work(async () => {
-                                      await command("/invoice/correct");
-                                    })
-                                  }
-                                >
-                                  Correct supplier draft
-                                  <ArrowRight size={15} />
-                                </button>
-                              )}
+                              {purchase.invoice.mismatch.length > 0 &&
+                                purchase.invoice.state !== "unknown" && (
+                                  <button
+                                    className="button primary"
+                                    disabled={busy || !can("approver")}
+                                    onClick={() =>
+                                      void work(async () => {
+                                        await command("/invoice/correct");
+                                      })
+                                    }
+                                  >
+                                    Correct supplier draft
+                                    <ArrowRight size={15} />
+                                  </button>
+                                )}
                               {purchase.invoice.state === "draft" && (
                                 <button
                                   className="button primary"

@@ -707,7 +707,8 @@ export function createApp(
         "No configured sandbox connection exists for this supplier.",
         503,
       );
-      if (!p.invoiceAttempt) {
+      const newAttempt = !p.invoiceAttempt;
+      if (newAttempt) {
         p.invoiceAttempt = {
           requestId: randomUUID(),
           requestedCents: body.mismatch
@@ -723,32 +724,53 @@ export function createApp(
         );
         await save(p, p.version);
       }
+      const attempt = p.invoiceAttempt!;
       try {
-        p.invoice = await paypal.draft(
-          p,
-          vendor.vendorId,
-          p.invoiceAttempt.requestId,
-          p.invoiceAttempt.requestedCents,
-        );
-        p.invoiceAttempt.state = "complete";
-        record(
-          p,
-          owner(res),
-          "invoice.created",
-          "Supplier sandbox draft retrieved and checked against the approved award.",
-        );
-        await save(p, p.version);
+        p.invoice = newAttempt
+          ? await paypal.draft(
+              p,
+              vendor.vendorId,
+              attempt.requestId,
+              attempt.requestedCents,
+            )
+          : await paypal.recoverDraft(
+              p,
+              vendor.vendorId,
+              attempt.requestedCents,
+            );
       } catch (error) {
-        p.invoiceAttempt.state = "uncertain";
+        attempt.state = "uncertain";
         record(
           p,
           owner(res),
           "invoice.uncertain",
-          "Upstream result is uncertain. Reuse the recorded request; never create a new attempt blindly.",
+          "Upstream result is uncertain. Recover by the recorded award and invoice number; no new invoice will be created on retry.",
         );
         await save(p, p.version);
         throw error;
       }
+      attempt.state = "complete";
+      record(
+        p,
+        owner(res),
+        "invoice.identity_recorded",
+        "Supplier invoice identity persisted before authoritative reconciliation.",
+      );
+      await save(p, p.version);
+      try {
+        p.invoice = await paypal.read(p, vendor.vendorId, p.invoice);
+      } catch {
+        // The persisted unknown state is safe to display and recover with a GET.
+        // Never repeat creation because a subsequent read was unavailable.
+        return void respond(res, p);
+      }
+      record(
+        p,
+        owner(res),
+        "invoice.created",
+        "Supplier sandbox invoice retrieved and checked against the approved award.",
+      );
+      await save(p, p.version);
     }
     respond(res, p);
   });

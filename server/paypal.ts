@@ -8,6 +8,7 @@ type PayPalInvoice = {
   id: string;
   status: string;
   detail: {
+    invoice_number?: string;
     reference?: string;
     currency_code: string;
     metadata?: { recipient_view_url?: string };
@@ -42,6 +43,8 @@ export function inspectInvoice(
   if (raw.id !== expected.id) errors.push("Invoice identity does not match");
   if (raw.detail.reference !== expected.reference)
     errors.push("Award reference does not match");
+  if (expected.number && raw.detail.invoice_number !== expected.number)
+    errors.push("Supplier invoice number does not match the recorded attempt");
   if (raw.detail.currency_code !== "USD" || raw.amount?.currency_code !== "USD")
     errors.push("Invoice currency is not USD");
   if (cents(raw.amount?.value) !== expected.expectedCents)
@@ -189,7 +192,7 @@ export class PayPal {
     ensure(p.award, "An approved award is required.");
     const merchant = this.merchant(vendorId);
     const reference = `BC-${p.award.id}`;
-    const body = this.invoiceBody(p, reference, requestedCents);
+    const body = this.invoiceBody(p, reference, requestedCents, merchant.email);
     const raw = (await this.call(
       vendorId,
       "/v2/invoicing/invoices",
@@ -202,30 +205,87 @@ export class PayPal {
       "PayPal did not return a valid invoice identity.",
       503,
     );
-    return this.read(p, vendorId, {
-      id: raw.id,
+    return this.pendingInvoice(p, vendorId, raw.id, requestedCents);
+  }
+  async recoverDraft(
+    p: Purchase,
+    vendorId: string,
+    requestedCents: number,
+  ): Promise<Invoice> {
+    ensure(p.award, "An approved award is required.");
+    const number = this.invoiceNumber(p);
+    const reference = `BC-${p.award.id}`;
+    const result = (await this.call(
+      vendorId,
+      "/v2/invoicing/search-invoices?page=1&page_size=2&total_required=true",
+      "POST",
+      { invoice_number: number, reference },
+    )) as { items?: PayPalInvoice[]; total_items?: number };
+    const matches =
+      result.items?.filter(
+        (invoice) =>
+          invoice.detail?.invoice_number === number &&
+          invoice.detail.reference === reference,
+      ) || [];
+    ensure(
+      matches.length === 1 && result.total_items === 1,
+      "The previous invoice attempt has no unique searchable result yet. Inspect the supplier sandbox account, then retry recovery. No new invoice was created.",
+      409,
+    );
+    return this.pendingInvoice(p, vendorId, matches[0].id, requestedCents);
+  }
+  private invoiceNumber(p: Purchase) {
+    ensure(p.award, "An approved award is required.");
+    // Preserve all UUID bits within PayPal's 25-character invoice-number limit.
+    return `BC-${Buffer.from(p.award.id.replaceAll("-", ""), "hex").toString("base64url")}`;
+  }
+  private pendingInvoice(
+    p: Purchase,
+    vendorId: string,
+    id: string,
+    requestedCents: number,
+  ): Invoice {
+    ensure(p.award, "An approved award is required.");
+    ensure(
+      /^INV2-[A-Z0-9-]+$/.test(id),
+      "PayPal did not return a valid invoice identity.",
+      503,
+    );
+    const merchant = this.merchant(vendorId);
+    return {
+      id,
+      number: this.invoiceNumber(p),
       provider: "paypal-sandbox",
       proposalId: p.award.proposalId,
       awardId: p.award.id,
       expectedCents: p.award.depositCents,
       requestedCents,
       currency: "USD",
-      reference,
+      reference: `BC-${p.award!.id}`,
       merchantEmail: merchant.email,
       buyerEmail: p.buyerEmail,
-      state: "draft",
-      mismatch: [],
-      lastReconciledAt: new Date().toISOString(),
-    });
+      state: "unknown",
+      mismatch: [
+        "Invoice identity recorded. Reconcile its authoritative terms before publication or payment.",
+      ],
+      lastReconciledAt: "",
+    };
   }
-  private invoiceBody(p: Purchase, reference: string, amount: number) {
+  private invoiceBody(
+    p: Purchase,
+    reference: string,
+    amount: number,
+    merchantEmail: string,
+  ) {
     return {
       detail: {
+        invoice_number: this.invoiceNumber(p),
         currency_code: "USD",
         reference,
         note: `Deposit for approved award ${p.award!.id}. Snapshot ${p.award!.snapshotHash.slice(0, 16)}. Synthetic sandbox transaction; no real money.`,
         payment_term: { term_type: "DUE_ON_RECEIPT" },
       },
+      invoicer: { email_address: merchantEmail },
       primary_recipients: [{ billing_info: { email_address: p.buyerEmail } }],
       items: [
         {
@@ -268,7 +328,12 @@ export class PayPal {
       vendorId,
       `/v2/invoicing/invoices/${invoice.id}`,
       "PUT",
-      this.invoiceBody(p, invoice.reference, invoice.expectedCents),
+      this.invoiceBody(
+        p,
+        invoice.reference,
+        invoice.expectedCents,
+        this.merchant(vendorId).email,
+      ),
     );
     return this.read(p, vendorId, invoice);
   }
